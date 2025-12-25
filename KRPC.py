@@ -1,5 +1,7 @@
 import krpc
 import time
+
+
 def connect_to_krpc():
     try:
         conn = krpc.connect(name='Polar Orbit Mission')
@@ -8,16 +10,22 @@ def connect_to_krpc():
     except Exception as e:
         print(f"Ошибка подключения: {e}")
         return None
+
+
 def initialize_mission(conn):
     vessel = conn.space_center.active_vessel
     control = vessel.control
     auto_pilot = vessel.auto_pilot
 
     return vessel, control, auto_pilot
+
+
 def enable_rcs(control):
     control.rcs = True
     print('РСУ включен.')
     return True
+
+
 def launch_and_gravity_turn(vessel, control):
     print("Наклонение на север")
 
@@ -25,14 +33,13 @@ def launch_and_gravity_turn(vessel, control):
     vessel.control.throttle = 1.0
     vessel.control.activate_next_stage()
 
-    while vessel.flight().mean_altitude < 50:
-        pass
-
     auto_pilot = vessel.auto_pilot
     auto_pilot.engage()
-    auto_pilot.target_pitch_and_heading(0, 0)
-    time.sleep(30)
+    auto_pilot.target_pitch_and_heading(60, 0)
+    time.sleep(50)
     return True
+
+
 def achieve_target_apoapsis(vessel, control, auto_pilot):
     auto_pilot.disengage()
     print("НАБОР ВЫСОТЫ ДО 150км")
@@ -50,9 +57,11 @@ def achieve_target_apoapsis(vessel, control, auto_pilot):
             control.throttle = 0.0
             break
 
-        time.sleep(0.5)
+        time.sleep(0.3)
 
     return True
+
+
 def activate_second_stage(vessel, control):
     while vessel.flight().mean_altitude < 80000:
         time.sleep(1)
@@ -60,6 +69,7 @@ def activate_second_stage(vessel, control):
     print("Отделение ТТУ")
     control.activate_next_stage()
     return True
+
 
 def polar_orbit_maneuver(vessel, conn, control, auto_pilot):
     print("Создание маневра")
@@ -97,11 +107,12 @@ def polar_orbit_maneuver(vessel, conn, control, auto_pilot):
 
     print("Выполнение маневра...")
     control.throttle = 1.0
+
     while node.remaining_delta_v > 2:
         if node.remaining_delta_v > 100 and node.remaining_delta_v < 200:
             control.throttle = 0.7
         elif node.remaining_delta_v > 10 and node.remaining_delta_v < 20:
-            control.throttle = 0.2
+            control.throttle = 0.4
         remaining_dv = node.remaining_delta_v
         print(f"Осталось ΔV: {remaining_dv:.1f} м/с")
 
@@ -113,14 +124,18 @@ def polar_orbit_maneuver(vessel, conn, control, auto_pilot):
     node.remove()
     time.sleep(2)
     final_orbit = vessel.orbit
-    print(f"Финальная орбита: Перицентр={final_orbit.periapsis:.0f} м, Апоцентр={final_orbit.apoapsis:.0f} м")
+    print(f"Финальная орбита: Перицентр={final_orbit.periapsis - 600000:.0f} м, Апоцентр={final_orbit.apoapsis - 600000:.0f} м")
 
     return True, print("Маневр выполнен")
+
+
 def time_warp(vessel, conn):
     orbit = vessel.orbit
-    warp_time = orbit.period - 200
+    warp_time = orbit.period - 300
     conn.space_center.warp_to(conn.space_center.ut + warp_time)
     return True
+
+
 def landing(conn, control):
     control.sas_mode = conn.space_center.SASMode.retrograde
     time.sleep(20)
@@ -129,7 +144,9 @@ def landing(conn, control):
     control.throttle = 0.0
     time.sleep(2)
     return True
-def final_stage(vessel, conn, control):
+
+
+def final_stage(conn, control):
     control.activate_next_stage()
     time.sleep(5)
 
@@ -140,6 +157,8 @@ def final_stage(vessel, conn, control):
     time.sleep(5)
 
     return True
+
+
 def main():
     print("Polar Orbit Mission")
 
@@ -158,7 +177,7 @@ def main():
             lambda: polar_orbit_maneuver(vessel, conn, control, auto_pilot),
             lambda: time_warp(vessel, conn),
             lambda: landing(conn, control),
-            lambda: final_stage(vessel, conn, control)
+            lambda: final_stage(conn, control)
         ]
 
         for phase in mission_phases:
